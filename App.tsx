@@ -5,114 +5,87 @@
  * @format
  */
 
-import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+import React, {useState} from 'react';
+import {StyleSheet, Text, View} from 'react-native';
+import {booleanPointInPolygon, point, polygon} from '@turf/turf';
+import Mapbox, {Camera, MapView, PointAnnotation} from '@rnmapbox/maps';
+import geo from './geo.json';
+import type {Position} from 'geojson';
+import GeoJSON from 'geojson';
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+Mapbox.setAccessToken(
+  'sk.eyJ1Ijoiam9obmRvZTAxMiIsImEiOiJjbHdnOHM4dHYwMmJjMmpzZDN0ZnZlaTU4In0.E_4MrE2TsfQ064L1MwQZ_g',
+);
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
+const styles = StyleSheet.create({
+  touchableContainer: {borderWidth: 1, width: 60, textAlign: 'center'},
+  page: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  container: {
+    height: '100%',
+    width: '100%',
+  },
+  map: {
+    flex: 1,
+  },
+});
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
+const AnnotationContent = ({title}: {title: string}) => (
+  <View style={styles.touchableContainer}>
+    <Text>{title}</Text>
+  </View>
+);
+
+const AllowedArea = 'Allowed Area';
+const NotAllowed = 'NOT Allowed Area';
 
 function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+  const [coord, setCoord] = React.useState<Position>([]);
+  const [allowed, setAlloved] = useState(false);
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
+  const handlePress = (feature: GeoJSON.Feature) => {
+    const pt = point(feature.geometry.coordinates ?? []);
+    const polygons = geo.features.map(f => f.geometry.coordinates);
+
+    const isAllowed = polygons.some(p => {
+      const poly = polygon(p);
+      return booleanPointInPolygon(pt, poly);
+    });
+
+    if (isAllowed) {
+      setAlloved(true);
+    } else {
+      setAlloved(false);
+    }
+    setCoord(pt.geometry.coordinates);
   };
 
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+    <View style={styles.page}>
+      <View style={styles.container}>
+        <MapView
+          zoomEnabled
+          id={'POLYGON'}
+          style={styles.map}
+          styleJSON={JSON.stringify(geo)}
+          styleURL={'mapbox://styles/johndoe012/clwg99fey00ku01qs1yz3b5n0'}
+          onPress={handlePress}>
+          <Camera
+            zoomLevel={9}
+            centerCoordinate={[58.86375121885138, 23.037377915198064]}
+          />
+          {coord.length ? (
+            <PointAnnotation coordinate={coord} id={'YES'}>
+              <AnnotationContent title={allowed ? AllowedArea : NotAllowed} />
+            </PointAnnotation>
+          ) : null}
+        </MapView>
+      </View>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
 
 export default App;
